@@ -1,0 +1,41 @@
+{
+  "name": "ios-device-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that drives a real, plugged-in iPhone or iPad (not the simulator) for app testing",
+  "license": "MIT",
+  "author": "Chris Thoma",
+  "homepage": "https://individuation.dev/projects/ios-device-mcp/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChrisThoma/ios-device-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "ios",
+    "iphone",
+    "ipad",
+    "xcuitest",
+    "device",
+    "testing",
+    "claude"
+  ],
+  "type": "module",
+  "bin": {
+    "ios-device-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "7.0.2"
+  }
+}

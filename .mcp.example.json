@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ios-device": {
+      "command": "node",
+      "args": ["/absolute/path/to/ios-device-mcp/dist/index.js"],
+      "env": {
+        "IOS_DEVICE_MCP_TEAM_ID": "YOURTEAMID",
+        "IOS_DEVICE_MCP_DEVICE": "optional device UDID or name"
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+name: DriverRunner
+options:
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    BUNDLE_PREFIX: dev.iosdevicemcp
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  DriverHost:
+    type: application
+    platform: iOS
+    sources: [DriverHost]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).host
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+  DriverUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [DriverUITests]
+    dependencies:
+      - target: DriverHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_PREFIX).driver
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: DriverHost
+schemes:
+  DriverUITests:
+    build:
+      targets:
+        DriverUITests: [test]
+    test:
+      targets: [DriverUITests]
