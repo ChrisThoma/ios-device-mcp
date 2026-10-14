@@ -49,6 +49,20 @@ The pre-rename `IPHONE_MCP_*` names are still read as a fallback.
 
 **First run on a device:** iOS asks for the passcode to allow UI automation. Keep the device unlocked while the driver starts.
 
+## Agent skill (optional)
+
+The repo also ships a skill that teaches your agent how to use these tools
+well: the build → launch → describe → act → verify loop, element IDs over
+coordinates, waiting instead of sleeping, and the device-safety rules.
+Install it with the [skills CLI](https://skills.sh):
+
+```sh
+npx skills add ChrisThoma/ios-device-mcp
+```
+
+Or copy `skills/ios-device-mcp` into `~/.claude/skills/`. The skill only
+guides the agent; the MCP server above is what does the work.
+
 ## Tools
 
 | Tool | What it does |
