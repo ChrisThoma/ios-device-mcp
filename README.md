@@ -80,7 +80,7 @@ guides the agent; the MCP server above is what does the work.
 | `record_audio` | Record the Mac mic for N seconds |
 | `set_volume` | Set media volume to a level (0–1, 16 steps), verified on the system volume indicator |
 | `tap_element`, `wait_for_element` | Find by text / accessibility ID / type, with waiting and `scrollDirection` scroll-to-find |
-| `type_text` | Type into the focused field (`submit` presses return) |
+| `type_text` | Type into the focused field (`submit` presses return, `deleteCount` deletes first) |
 | `press_button` | `home`, `volumeUp`, `volumeDown` |
 | `open_url` | Open a URL or deep link |
 | `set_orientation` | Rotate the interface |
@@ -91,6 +91,7 @@ Text matching in `tap_element` tries exact label/ID/value matches first, then wh
 ## Known limitations
 
 - **Foreground app:** detected from the last launched app, else by scanning installed apps' states, else SpringBoard.
+- **Taps go to the foreground app:** coordinates are anchored to the app in front. Anchored to SpringBoard, a tap on an in-app alert button also reached the view behind the alert.
 - **Home button:** `XCUIDevice.press(.home)` is ignored on some iOS 26 builds, so the driver falls back to activating SpringBoard. The press takes about 2–3 s.
 - **Landscape:** coordinates are screen points in the current orientation, and landscape has had little testing.
 - **Logs:** `os_log`/`Logger` capture works like Xcode's console: the app is launched with `OS_ACTIVITY_DT_MODE` (and `OS_ACTIVITY_MODE=debug`), which mirrors its log messages to stderr. Only messages from the app's own process are captured, not from system daemons or extensions. Private values show in plain text. Lines show `[category]` but not the subsystem.

@@ -76,8 +76,12 @@ final class DriverTests: XCTestCase {
             return .json(result)
 
         case ("POST", "/tap"):
-            coordinate(body).tap()
-            return .json(["ok": true])
+            let received = Date()
+            let point = coordinate(body)
+            // Time spent before the touch starts, so audio sync can exclude it.
+            let setup = Date().timeIntervalSince(received)
+            point.tap()
+            return .json(["ok": true, "setup": setup])
 
         case ("POST", "/double_tap"):
             coordinate(body).doubleTap()
@@ -277,11 +281,16 @@ final class DriverTests: XCTestCase {
         springboard.frame.size
     }
 
-    /// Screen-absolute coordinate in points.
+    /// Screen-absolute coordinate in points, anchored to the foreground app.
+    /// Anchored to SpringBoard instead, a tap on an in-app alert button also
+    /// reaches the view behind the alert.
     private func coordinate(_ body: [String: Any]) -> XCUICoordinate {
         let x = (body["x"] as? NSNumber)?.doubleValue ?? 0
         let y = (body["y"] as? NSNumber)?.doubleValue ?? 0
-        return springboard.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
+        let (app, bundleId) = foregroundApp()
+        // The app's frame isn't at the screen origin in iPad Split View or Stage Manager.
+        let origin = bundleId == "com.apple.springboard" ? .zero : app.frame.origin
+        return app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x - origin.x, dy: y - origin.y))
     }
 
     private func screenshot(quality: Double, fullRes: Bool) -> [String: Any] {

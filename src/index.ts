@@ -351,9 +351,11 @@ async function withRecording(opts: RecordAudio, action: () => Promise<unknown>):
   const rec = await startRecording(leadIn + opts.seconds + 1, opts.audioDevice);
   try {
     await new Promise((r) => setTimeout(r, Math.max(0, rec.startedAt + leadIn * 1000 - Date.now())));
-    const sent = Date.now();
-    await action();
+    const before = Date.now();
+    // The driver reports how long it spent finding the target before touching it.
+    const result: any = await action();
     const acked = Date.now();
+    const sent = before + Math.round((typeof result?.setup === "number" ? result.setup : 0) * 1000);
     await rec.done;
     const offset = (t: number) => `${((t - rec.startedAt) / 1000).toFixed(3)}s`;
     const length = fileSeconds(rec.path);
@@ -554,12 +556,19 @@ server.registerTool(
   "type_text",
   {
     description: "Type into the focused text field (tap the field first). Use \\n for return.",
-    inputSchema: { ...deviceArg, text: z.string(), submit: z.boolean().optional().describe("Press return after typing") },
+    inputSchema: {
+      ...deviceArg,
+      text: z.string(),
+      submit: z.boolean().optional().describe("Press return after typing"),
+      deleteCount: z.number().int().min(0).optional().describe("Press delete this many times before typing, e.g. to clear a field"),
+    },
   },
-  handle(async ({ device, text: value, submit }) => {
+  handle(async ({ device, text: value, submit, deleteCount = 0 }) => {
     const { driver } = await getDriver(device);
-    await driver.request("POST", "/type", { text: submit ? value + "\n" : value });
-    return text(`Typed ${JSON.stringify(value)}${submit ? " + return" : ""}`);
+    // U+0008 is XCUIKeyboardKey.delete.
+    await driver.request("POST", "/type", { text: "\u0008".repeat(deleteCount) + value + (submit ? "\n" : "") });
+    const deleted = deleteCount ? `Deleted ${deleteCount} and typed` : "Typed";
+    return text(`${deleted} ${JSON.stringify(value)}${submit ? " + return" : ""}`);
   }),
 );
 

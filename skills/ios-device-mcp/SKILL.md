@@ -38,7 +38,8 @@ https://github.com/ChrisThoma/ios-device-mcp and stop.
    then `text`, over raw `tap` coordinates. Add `scrollDirection` when the
    target may be below the fold, since lists only load visible rows.
    `type_text` needs a focused field, so tap it first; `submit: true`
-   presses return.
+   presses return, and `deleteCount` presses delete first (to clear or
+   edit a field).
 5. **Wait, don't sleep:** `wait_for_element` for the next screen (or
    `gone: true` for a spinner) instead of fixed delays.
 6. **Check results:** `get_app_logs` with `grep` (e.g. `\[network\]`,
