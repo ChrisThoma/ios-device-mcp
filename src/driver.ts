@@ -127,10 +127,16 @@ export class Driver {
     const xctestrun = await buildRunner(this.udid, rebuild);
     log(`starting driver on ${this.udid}`);
     this.output = [];
+    // When the run ends, xcodebuild collects diagnostics with `devicectl diagnose`, which runs sudo.
+    // sudo prompts for a password on the controlling terminal, which is Claude Code's input box.
+    // Skip the collection, and detach so nothing the driver spawns can reach the terminal.
     const child = spawn(
       "xcodebuild",
-      ["test-without-building", "-xctestrun", xctestrun, "-destination", `id=${this.udid}`, "-test-timeouts-enabled", "NO"],
-      { env: { ...process.env, TEST_RUNNER_DRIVER_PORT: String(PORT) }, stdio: ["ignore", "pipe", "pipe"] },
+      [
+        "test-without-building", "-xctestrun", xctestrun, "-destination", `id=${this.udid}`,
+        "-test-timeouts-enabled", "NO", "-collect-test-diagnostics", "never",
+      ],
+      { env: { ...process.env, TEST_RUNNER_DRIVER_PORT: String(PORT) }, stdio: ["ignore", "pipe", "pipe"], detached: true },
     );
     this.process = child;
     const collect = (chunk: Buffer) => {
