@@ -322,7 +322,7 @@ server.registerTool(
     const result = await getTree(driver, bundleId);
     if (format === "json") return text(JSON.stringify(result));
     let out = `App: ${result.bundleId}\n${renderTree(result.tree, { includeOffscreen })}`;
-    for (const alert of result.systemAlerts ?? []) out += `\n\nSystem alert:\n${renderTree(alert)}`;
+    for (const alert of result.systemAlerts ?? []) out += `\n\nSystem alert:\n${renderTree(alert, { screen: result.tree.frame })}`;
     return text(out);
   }),
 );
@@ -430,7 +430,7 @@ async function waitForElement(driver: Driver, q: WaitQuery, gone = false) {
   for (;;) {
     const { tree, systemAlerts = [] } = await getTree(driver);
     // System alerts sit above the app, so search them first.
-    let matches = [...systemAlerts.flatMap((a) => findElements(a, q)), ...findElements(tree, q)];
+    let matches = [...systemAlerts.flatMap((a) => findElements(a, q, tree.frame)), ...findElements(tree, q)];
     if (q.scrollDirection && !gone) matches = matches.filter((m) => m.onScreen);
     const found = matches[q.index ?? 0];
     if (gone && !found) return { found, matches };

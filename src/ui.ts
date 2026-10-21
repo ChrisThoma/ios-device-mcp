@@ -54,8 +54,7 @@ function quote(s: string, max = 80): string {
  * Render the tree as compact indented text, dropping zero-size subtrees and
  * structural wrappers that carry no label, id or interactivity.
  */
-export function renderTree(root: UINode, { includeOffscreen = false } = {}): string {
-  const screen = root.frame;
+export function renderTree(root: UINode, { includeOffscreen = false, screen = root.frame } = {}): string {
   const lines: string[] = [];
   const walk = (n: UINode, depth: number) => {
     const inView = onScreen(n.frame, screen);
@@ -81,8 +80,7 @@ export function renderTree(root: UINode, { includeOffscreen = false } = {}): str
   return lines.join("\n");
 }
 
-export function flatten(root: UINode): FlatElement[] {
-  const screen = root.frame;
+export function flatten(root: UINode, screen = root.frame): FlatElement[] {
   const out: FlatElement[] = [];
   const walk = (n: UINode) => {
     if (visible(n)) out.push({
@@ -120,19 +118,27 @@ function escapeRegExp(s: string): string {
  */
 function partialMatch(needle: string, fields: (string | undefined)[]): boolean {
   const word = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(needle)}($|[^\\p{L}\\p{N}])`, "u");
-  return fields.some((f) => !!f && f.length <= Math.max(needle.length * 3, 40) && word.test(f.toLowerCase()));
+  return fields.some((f) => !!f && f.length <= Math.max(needle.length * 3, 40) && word.test(fold(f)));
 }
 
-/** Find elements matching a query; exact text matches rank above partial ones. */
-export function findElements(root: UINode, q: ElementQuery): FlatElement[] {
-  const needle = q.text?.toLowerCase();
+/** Lowercase, with curly quotes straightened (iOS labels use them, e.g. "Don’t Allow"). */
+function fold(s: string): string {
+  return s.toLowerCase().replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+}
+
+/**
+ * Find elements matching a query; exact text matches rank above partial ones.
+ * Pass the screen frame when root isn't full-screen (a system alert).
+ */
+export function findElements(root: UINode, q: ElementQuery, screen = root.frame): FlatElement[] {
+  const needle = q.text && fold(q.text);
   const scored: { el: FlatElement; score: number }[] = [];
-  for (const el of flatten(root)) {
+  for (const el of flatten(root, screen)) {
     if (q.type && el.type.toLowerCase() !== q.type.toLowerCase()) continue;
     if (q.id && el.id !== q.id) continue;
     let score = 1;
     if (needle) {
-      const fields = [el.label, el.id, el.value, el.placeholder].filter(Boolean).map((s) => s!.toLowerCase());
+      const fields = [el.label, el.id, el.value, el.placeholder].filter(Boolean).map((s) => fold(s!));
       if (fields.some((f) => f === needle)) score = 3;
       else if (!q.exact && partialMatch(needle, [el.label, el.id, el.placeholder])) score = 2;
       else continue;

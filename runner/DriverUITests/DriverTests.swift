@@ -287,6 +287,12 @@ final class DriverTests: XCTestCase {
     private func coordinate(_ body: [String: Any]) -> XCUICoordinate {
         let x = (body["x"] as? NSNumber)?.doubleValue ?? 0
         let y = (body["y"] as? NSNumber)?.doubleValue ?? 0
+        // System alerts (permission prompts) belong to SpringBoard, and a touch
+        // anchored to the app never reaches them.
+        let alert = springboard.alerts.firstMatch
+        if alert.exists, alert.frame.contains(CGPoint(x: x, y: y)) {
+            return springboard.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
+        }
         let (app, bundleId) = foregroundApp()
         // The app's frame isn't at the screen origin in iPad Split View or Stage Manager.
         let origin = bundleId == "com.apple.springboard" ? .zero : app.frame.origin

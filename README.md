@@ -91,7 +91,7 @@ Text matching in `tap_element` tries exact label/ID/value matches first, then wh
 ## Known limitations
 
 - **Foreground app:** detected from the last launched app, else by scanning installed apps' states, else SpringBoard.
-- **Taps go to the foreground app:** coordinates are anchored to the app in front. Anchored to SpringBoard, a tap on an in-app alert button also reached the view behind the alert.
+- **Taps go to the foreground app:** coordinates are anchored to the app in front. Anchored to SpringBoard, a tap on an in-app alert button also reached the view behind the alert. A tap inside a system alert (permission prompt) is anchored to SpringBoard instead: anchored to the app, XCTest's interruption handling answered the alert itself, so "Don’t Allow" granted the permission.
 - **Home button:** `XCUIDevice.press(.home)` is ignored on some iOS 26 builds, so the driver falls back to activating SpringBoard. The press takes about 2–3 s.
 - **Landscape:** coordinates are screen points in the current orientation, and landscape has had little testing.
 - **Logs:** `os_log`/`Logger` capture works like Xcode's console: the app is launched with `OS_ACTIVITY_DT_MODE` (and `OS_ACTIVITY_MODE=debug`), which mirrors its log messages to stderr. Only messages from the app's own process are captured, not from system daemons or extensions. Private values show in plain text. Lines show `[category]` but not the subsystem.
