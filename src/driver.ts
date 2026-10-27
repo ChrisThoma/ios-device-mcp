@@ -34,8 +34,17 @@ function findXctestrun(): string | undefined {
   return file && join(PRODUCTS_DIR, file);
 }
 
+// Drivers for several devices share one build directory, so builds run one at a time.
+let buildQueue: Promise<unknown> = Promise.resolve();
+
 /** Build the XCUITest runner if it is missing or its sources changed. */
-export async function buildRunner(udid: string, force = false): Promise<string> {
+export function buildRunner(udid: string, force = false): Promise<string> {
+  const build = buildQueue.then(() => buildRunnerNow(udid, force));
+  buildQueue = build.catch(() => {});
+  return build;
+}
+
+async function buildRunnerNow(udid: string, force: boolean): Promise<string> {
   const existing = findXctestrun();
   if (existing && !force && statSync(existing).mtimeMs >= newestMtime(RUNNER_DIR)) return existing;
 

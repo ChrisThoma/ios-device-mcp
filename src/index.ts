@@ -35,7 +35,7 @@ const deviceArg = {
   device: z
     .string()
     .optional()
-    .describe("Device UDID or name substring. Defaults to IOS_DEVICE_MCP_DEVICE, else the single USB-connected device."),
+    .describe("Device UDID or name substring. Defaults to the select_device choice, then IOS_DEVICE_MCP_DEVICE, else the single USB-connected device."),
 };
 
 async function getDriver(device?: string): Promise<{ udid: string; driver: Driver }> {
@@ -63,15 +63,34 @@ async function getTree(driver: Driver, bundleId?: string) {
 
 server.registerTool(
   "list_devices",
-  { description: "List physical iPhones/iPads known to this Mac, with connection state." },
+  { description: "List physical iPhones/iPads known to this Mac, with connection state. The device tools use by default is marked." },
   handle(async () => {
     const devices = await dc.listDevices();
     if (!devices.length) return text("No physical devices found.");
+    const current = await dc.resolveDevice().catch(() => undefined);
     return text(
       devices
-        .map((d) => `${d.name} — ${d.model} iOS ${d.osVersion}\n  udid=${d.udid} transport=${d.transport ?? "offline"} tunnel=${d.tunnelState ?? "?"}`)
+        .map((d) => {
+          const mark = d.udid === current?.udid ? "  [default]" : "";
+          return `${d.name} — ${d.model} iOS ${d.osVersion}${mark}\n  udid=${d.udid} transport=${d.transport ?? "offline"} tunnel=${d.tunnelState ?? "?"}`;
+        })
         .join("\n"),
     );
+  }),
+);
+
+server.registerTool(
+  "select_device",
+  {
+    description:
+      "Choose which device later calls use when they don't pass \"device\". Lasts for this server session. Omit device to clear the choice.",
+    inputSchema: { device: z.string().optional().describe("Device UDID or name substring; omit to clear") },
+  },
+  handle(async ({ device }) => {
+    const chosen = await dc.selectDevice(device);
+    if (chosen) return text(`Using ${chosen.name} (${chosen.udid}) by default`);
+    const fallback = await dc.resolveDevice().catch((err) => err as Error);
+    return text(`Cleared. ${fallback instanceof Error ? fallback.message : `Default is now ${fallback.name} (${fallback.udid})`}`);
   }),
 );
 

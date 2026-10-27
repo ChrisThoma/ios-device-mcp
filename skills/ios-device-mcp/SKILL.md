@@ -16,6 +16,8 @@ https://github.com/ChrisThoma/ios-device-mcp and stop.
   server uses the one iPhone/iPad on the USB cable (or the device pinned in
   `IOS_DEVICE_MCP_DEVICE`). If `list_devices` shows several and it's
   unclear which to use, ask. Never pick a Wi-Fi-only device on your own.
+  Once you know, `select_device` it so later calls go there. With two
+  devices in play, pass `device` on every call to the other one.
 - **The device is personal.** It's usually the user's own phone, so don't
   change settings, send messages, make purchases or confirm destructive
   dialogs ("Delete", "Reset", "Erase") outside the app under test.

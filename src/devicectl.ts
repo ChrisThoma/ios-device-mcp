@@ -88,13 +88,25 @@ export async function deviceDetails(udid: string): Promise<Device> {
   return device;
 }
 
+// The device chosen with select_device; it applies to calls that don't name one.
+let selectedUdid: string | undefined;
+
+/** Make a device the default for later calls, or clear the choice with undefined. */
+export async function selectDevice(selector?: string): Promise<Device | undefined> {
+  selectedUdid = undefined;
+  if (!selector) return undefined;
+  const device = await resolveDevice(selector);
+  selectedUdid = device.udid;
+  return device;
+}
+
 /**
- * Resolve a device by UDID or name substring. With no selector, use
- * IOS_DEVICE_MCP_DEVICE, else the only connected device.
+ * Resolve a device by UDID or name substring. With no selector, use the
+ * select_device choice, then IOS_DEVICE_MCP_DEVICE, else the only USB device.
  */
 export async function resolveDevice(selector?: string): Promise<Device> {
   const devices = await listDevices();
-  const wanted = selector ?? env("DEVICE");
+  const wanted = selector ?? selectedUdid ?? env("DEVICE");
   if (wanted) {
     const needle = wanted.toLowerCase();
     const exact =
@@ -115,7 +127,7 @@ export async function resolveDevice(selector?: string): Promise<Device> {
       `No USB-connected iPhone/iPad found. Plug one in and unlock it, or set IOS_DEVICE_MCP_DEVICE / pass "device" explicitly. Known: ${devices.map((d) => `${d.name} (${d.udid}, ${d.transport ?? "offline"})`).join(", ")}`,
     );
   }
-  throw new Error(`Several USB devices connected; pass "device": ${wired.map((d) => `${d.name} (${d.udid})`).join(", ")}`);
+  throw new Error(`Several USB devices connected; pass "device" or call select_device: ${wired.map((d) => `${d.name} (${d.udid})`).join(", ")}`);
 }
 
 export async function listApps(udid: string, includeSystem = false): Promise<App[]> {

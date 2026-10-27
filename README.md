@@ -45,7 +45,9 @@ Other MCP clients: run `node dist/index.js` over stdio with the same env vars. S
 
 The pre-rename `IPHONE_MCP_*` names are still read as a fallback.
 
-**Device selection:** if neither `IOS_DEVICE_MCP_DEVICE` nor a tool's `device` argument is set, the server only picks a device that is physically connected over USB. It never picks a Wi-Fi-only device implicitly.
+**Device selection:** every tool takes a `device` argument (UDID or name). Without one, a tool uses the device chosen with `select_device`, then `IOS_DEVICE_MCP_DEVICE`, then the one device physically connected over USB. It never picks a Wi-Fi-only device implicitly, and with several on USB it asks for a choice.
+
+**Several devices at once:** each device gets its own driver, so you can drive two phones in one session by passing `device` per call, or `select_device` one and pass `device` only for the other. Runner builds for different devices share one build directory and run one after another.
 
 **First run on a device:** iOS asks for the passcode to allow UI automation. Keep the device unlocked while the driver starts.
 
@@ -67,7 +69,8 @@ guides the agent; the MCP server above is what does the work.
 
 | Tool | What it does |
 | --- | --- |
-| `list_devices`, `list_apps` | Show devices and installed apps |
+| `list_devices`, `list_apps` | Show devices (the current default is marked) and installed apps |
+| `select_device` | Set the device tools use when they don't pass `device`; call with no device to clear |
 | `build_app` | `xcodebuild` a project/workspace scheme for the device and install it |
 | `install_app`, `uninstall_app` | Install a `.app`/`.ipa`, remove an app |
 | `launch_app` | Launch/relaunch; `captureLogs: true` buffers the app's console: `print`/`NSLog` plus `os_log`/`Logger` (`logLevel`: `debug` default, `info`, `stdout`) |
