@@ -1,6 +1,10 @@
 # ios-device-mcp
 
+![ios-device-mcp: an MCP server for testing on a real iPhone](https://individuation.dev/projects/ios-device-mcp/share-card.png)
+
 An MCP server that drives a real iPhone or iPad (not the simulator) over USB for app development testing. It can build and install your app, launch it with console log capture, read the accessibility tree, tap, swipe, type and take screenshots.
+
+More about it: [individuation.dev/projects/ios-device-mcp](https://individuation.dev/projects/ios-device-mcp/).
 
 ## How it works
 
