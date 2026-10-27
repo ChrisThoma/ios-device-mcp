@@ -17,7 +17,9 @@ https://github.com/ChrisThoma/ios-device-mcp and stop.
   `IOS_DEVICE_MCP_DEVICE`). If `list_devices` shows several and it's
   unclear which to use, ask. Never pick a Wi-Fi-only device on your own.
   Once you know, `select_device` it so later calls go there. With two
-  devices in play, pass `device` on every call to the other one.
+  devices in play, pass `device` on every call to the other one. The
+  choice is shared by every agent using the server, so subagents working
+  on different devices pass `device` on every call and never select.
 - **The device is personal.** It's usually the user's own phone, so don't
   change settings, send messages, make purchases or confirm destructive
   dialogs ("Delete", "Reset", "Erase") outside the app under test.

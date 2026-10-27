@@ -93,11 +93,15 @@ let selectedUdid: string | undefined;
 
 /** Make a device the default for later calls, or clear the choice with undefined. */
 export async function selectDevice(selector?: string): Promise<Device | undefined> {
-  selectedUdid = undefined;
-  if (!selector) return undefined;
-  const device = await resolveDevice(selector);
-  selectedUdid = device.udid;
+  // Resolve before assigning, so a typo keeps the earlier choice.
+  const device = selector ? await resolveDevice(selector) : undefined;
+  selectedUdid = device?.udid;
   return device;
+}
+
+/** Lowercase, with curly apostrophes straightened: device names use them ("Chris’s iPhone"). */
+function fold(s: string): string {
+  return s.toLowerCase().replace(/[‘’]/g, "'");
 }
 
 /**
@@ -108,12 +112,15 @@ export async function resolveDevice(selector?: string): Promise<Device> {
   const devices = await listDevices();
   const wanted = selector ?? selectedUdid ?? env("DEVICE");
   if (wanted) {
-    const needle = wanted.toLowerCase();
+    const needle = fold(wanted);
     const exact =
-      devices.find((d) => d.udid.toLowerCase() === needle) ?? devices.find((d) => d.name.toLowerCase() === needle);
+      devices.find((d) => d.udid.toLowerCase() === needle) ?? devices.find((d) => fold(d.name) === needle);
     if (exact) return exact;
+    if (!selector && wanted === selectedUdid) {
+      throw new Error(`The device chosen with select_device (${wanted}) is no longer listed. Reconnect it, or select_device another.`);
+    }
     // A partial name must be unambiguous: "My iPhone" also matches "My iPhone (2)".
-    const partial = devices.filter((d) => d.name.toLowerCase().includes(needle));
+    const partial = devices.filter((d) => fold(d.name).includes(needle));
     const list = (ds: Device[]) => ds.map((d) => `${d.name} (${d.udid})`).join(", ");
     if (partial.length === 1) return partial[0];
     if (partial.length > 1) throw new Error(`"${wanted}" matches several devices: ${list(partial)}. Use the full name or UDID.`);
@@ -124,7 +131,7 @@ export async function resolveDevice(selector?: string): Promise<Device> {
   if (wired.length === 1) return wired[0];
   if (wired.length === 0) {
     throw new Error(
-      `No USB-connected iPhone/iPad found. Plug one in and unlock it, or set IOS_DEVICE_MCP_DEVICE / pass "device" explicitly. Known: ${devices.map((d) => `${d.name} (${d.udid}, ${d.transport ?? "offline"})`).join(", ")}`,
+      `No USB-connected iPhone/iPad found. Plug one in and unlock it, or pass "device", call select_device, or set IOS_DEVICE_MCP_DEVICE. Known: ${devices.map((d) => `${d.name} (${d.udid}, ${d.transport ?? "offline"})`).join(", ")}`,
     );
   }
   throw new Error(`Several USB devices connected; pass "device" or call select_device: ${wired.map((d) => `${d.name} (${d.udid})`).join(", ")}`);

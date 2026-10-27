@@ -83,7 +83,7 @@ server.registerTool(
   "select_device",
   {
     description:
-      "Choose which device later calls use when they don't pass \"device\". Lasts for this server session. Omit device to clear the choice.",
+      "Choose which device later calls use when they don't pass \"device\". Lasts for this server session and is shared by every agent using it, so parallel agents on different devices should pass \"device\" instead. Omit device to clear the choice.",
     inputSchema: { device: z.string().optional().describe("Device UDID or name substring; omit to clear") },
   },
   handle(async ({ device }) => {
