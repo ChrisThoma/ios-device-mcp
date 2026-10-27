@@ -37,7 +37,38 @@ function findXctestrun(): string | undefined {
 // Drivers for several devices share one build directory, so builds run one at a time.
 let buildQueue: Promise<unknown> = Promise.resolve();
 
-/** Build the XCUITest runner if it is missing or its sources changed. */
+/**
+ * Whether every built runner app's provisioning profile covers this device. A build made
+ * while only one device was registered can't install on a second one.
+ */
+export async function profilesInclude(udid: string): Promise<boolean> {
+  const appsDir = join(PRODUCTS_DIR, "Debug-iphoneos");
+  if (!existsSync(appsDir)) return false;
+  const profiles = readdirSync(appsDir)
+    .filter((f) => f.endsWith(".app"))
+    .map((f) => join(appsDir, f, "embedded.mobileprovision"))
+    .filter(existsSync);
+  if (!profiles.length) return false;
+  for (const profile of profiles) {
+    try {
+      const { stdout: xml } = await exec("security", ["cms", "-D", "-i", profile]);
+      // The whole profile has dates and data that JSON can't hold, so read single keys.
+      const extract = (key: string, format: string) =>
+        new Promise<string | undefined>((resolve) => {
+          const child = execFile("plutil", ["-extract", key, format, "-o", "-", "-"], (err, out) => resolve(err ? undefined : out.trim()));
+          child.stdin!.end(xml);
+        });
+      if ((await extract("ProvisionsAllDevices", "raw")) === "true") continue;
+      const devices = await extract("ProvisionedDevices", "json");
+      if (!devices || !JSON.parse(devices).includes(udid)) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Build the XCUITest runner if it is missing, its sources changed, or its profile lacks the device. */
 export function buildRunner(udid: string, force = false): Promise<string> {
   const build = buildQueue.then(() => buildRunnerNow(udid, force));
   buildQueue = build.catch(() => {});
@@ -46,7 +77,10 @@ export function buildRunner(udid: string, force = false): Promise<string> {
 
 async function buildRunnerNow(udid: string, force: boolean): Promise<string> {
   const existing = findXctestrun();
-  if (existing && !force && statSync(existing).mtimeMs >= newestMtime(RUNNER_DIR)) return existing;
+  if (existing && !force && statSync(existing).mtimeMs >= newestMtime(RUNNER_DIR)) {
+    if (await profilesInclude(udid)) return existing;
+    log(`runner profile doesn't include ${udid}; rebuilding`);
+  }
 
   const team = env("TEAM_ID");
   if (!team) {
