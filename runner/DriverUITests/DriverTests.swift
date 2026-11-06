@@ -221,7 +221,9 @@ final class DriverTests: XCTestCase {
     /// The app the driver should act on: the last known foreground app if it is
     /// still in front, else whichever candidate app is, else SpringBoard.
     private func foregroundApp() -> (app: XCUIApplication, bundleId: String) {
-        for id in [currentBundleId].compactMap({ $0 }) + candidateBundleIds where id != "com.apple.springboard" {
+        // CarPlay's system app can report runningForeground with no car attached.
+        let notApps: Set<String> = ["com.apple.springboard", "com.apple.CarPlayApp"]
+        for id in [currentBundleId].compactMap({ $0 }) + candidateBundleIds where !notApps.contains(id) {
             let app = XCUIApplication(bundleIdentifier: id)
             if app.state == .runningForeground {
                 // App state can lag several seconds behind leaving the app; if the
