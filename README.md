@@ -88,7 +88,8 @@ guides the agent; the MCP server above is what does the work.
 | `set_volume` | Set media volume to a level (0–1, 16 steps), verified on the system volume indicator |
 | `tap_element`, `wait_for_element` | Find by text / accessibility ID / type, with waiting and `scrollDirection` scroll-to-find |
 | `type_text` | Type into the focused field (`submit` presses return, `deleteCount` deletes first) |
-| `press_button` | `home`, `volumeUp`, `volumeDown` |
+| `press_button` | `home`, `volumeUp`, `volumeDown`, `action`, `camera` |
+| `siri` | Send text to Siri as if spoken, or tap something it shows, and read back what it shows. Its first-run "Turn on shortcuts" prompt only works from Type to Siri (double-tap the bottom edge) |
 | `open_url` | Open a URL or deep link |
 | `set_orientation` | Rotate the interface |
 | `start_driver`, `stop_driver` | Manage the on-device driver explicitly (`rebuild: true` forces a rebuild) |

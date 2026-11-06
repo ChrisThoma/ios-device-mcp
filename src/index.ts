@@ -594,13 +594,33 @@ server.registerTool(
 server.registerTool(
   "press_button",
   {
-    description: "Press a hardware button. \"home\" goes to the home screen.",
-    inputSchema: { ...deviceArg, name: z.enum(["home", "volumeUp", "volumeDown"]) },
+    description:
+      "Press a hardware button. \"home\" goes to the home screen. \"action\" and \"camera\" run whatever the phone has them set to, and fail on a device without that button.",
+    inputSchema: { ...deviceArg, name: z.enum(["home", "volumeUp", "volumeDown", "action", "camera"]) },
   },
   handle(async ({ device, name }) => {
     const { driver } = await getDriver(device);
     await driver.request("POST", "/button", { name });
     return text(`Pressed ${name}`);
+  }),
+);
+
+server.registerTool(
+  "siri",
+  {
+    description:
+      "Send text to Siri as if it had been spoken, or tap something Siri is showing, then return the text Siri shows. Use tap for Siri's buttons, because a coordinate tap goes to the app behind Siri and dismisses it. Anything Siri can do runs for real, including App Intents. An app's first-run \"Turn on shortcuts with Siri?\" prompt fails with \"Something went wrong\" after text sent this way: double-tap the bottom edge of the screen to open Type to Siri, type the phrase, tap the send arrow, then use tap for Turn On.",
+    inputSchema: {
+      ...deviceArg,
+      text: z.string().optional().describe("What to say to Siri"),
+      tap: z.string().optional().describe("Label of a button or row Siri is showing, instead of text"),
+      wait: z.number().optional().describe("Seconds to wait before reading Siri's UI (default 6)"),
+    },
+  },
+  handle(async ({ device, text: query, tap, wait }) => {
+    const { driver } = await getDriver(device);
+    const result = await driver.request("POST", "/siri", { text: query, tap, wait });
+    return text(result.labels?.length ? result.labels.join("\n") : "Siri showed no readable text; take a screenshot.");
   }),
 );
 

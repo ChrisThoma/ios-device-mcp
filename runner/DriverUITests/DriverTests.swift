@@ -107,9 +107,14 @@ final class DriverTests: XCTestCase {
             return .json(["ok": true])
 
         case ("POST", "/button"):
-            let buttons: [String: XCUIDevice.Button] = ["home": .home, "volumeUp": .volumeUp, "volumeDown": .volumeDown]
+            let buttons: [String: XCUIDevice.Button] = [
+                "home": .home, "volumeUp": .volumeUp, "volumeDown": .volumeDown, "action": .action, "camera": .camera,
+            ]
             guard let name = body["name"] as? String, let button = buttons[name] else {
                 return .error("name must be one of: \(buttons.keys.sorted().joined(separator: ", "))", status: 400)
+            }
+            guard XCUIDevice.shared.hasHardwareButton(button) else {
+                return .error("this device has no \(name) button", status: 400)
             }
             let previous = name == "home" ? foregroundApp() : nil
             XCUIDevice.shared.press(button)
@@ -124,6 +129,27 @@ final class DriverTests: XCTestCase {
             }
             if name == "home" { currentBundleId = nil }
             return .json(["ok": true])
+
+        case ("POST", "/siri"):
+            let siri = XCUIDevice.shared.siriService
+            if let label = body["tap"] as? String {
+                // Coordinate taps go to the app behind Siri and dismiss it.
+                let matches = [siri.buttons[label], siri.staticTexts[label]]
+                guard let match = matches.first(where: { $0.exists }) else {
+                    return .error("Siri shows nothing labelled \"\(label)\"", status: 404)
+                }
+                match.tap()
+            } else if let text = body["text"] as? String {
+                siri.activate(voiceRecognitionText: text)
+            } else {
+                return .error("text or tap is required", status: 400)
+            }
+            // Siri has no finished signal, so read what it shows after a fixed wait.
+            RunLoop.current.run(until: Date().addingTimeInterval(body["wait"] as? Double ?? 6))
+            let elements = siri.staticTexts.allElementsBoundByIndex + siri.buttons.allElementsBoundByIndex
+            // Siri can dismiss itself mid-read. A snapshot throws where .label would end the test run.
+            let labels = elements.compactMap { (try? $0.snapshot())?.label }.filter { !$0.isEmpty }
+            return .json(["ok": true, "labels": labels])
 
         case ("POST", "/launch"):
             guard let bundleId = body["bundleId"] as? String else { return .error("bundleId is required", status: 400) }
