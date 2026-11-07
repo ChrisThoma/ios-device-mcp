@@ -2,7 +2,7 @@
 
 ![ios-device-mcp: an MCP server for testing on a real iPhone](https://individuation.dev/projects/ios-device-mcp/share-card.png)
 
-An MCP server that drives a real iPhone or iPad (not the simulator) over USB for app development testing. It can build and install your app, launch it with console log capture, read the accessibility tree, tap, swipe, type and take screenshots.
+An MCP server that drives a real iPhone or iPad (not the simulator) over USB for app development testing. It can build and install your app, launch it with console log capture, read the accessibility tree, tap, swipe, type and take screenshots. It can also talk to Siri and press the Action button, so an agent can run your App Intents on the phone.
 
 More about it: [individuation.dev/projects/ios-device-mcp](https://individuation.dev/projects/ios-device-mcp/).
 
@@ -88,13 +88,31 @@ guides the agent; the MCP server above is what does the work.
 | `set_volume` | Set media volume to a level (0–1, 16 steps), verified on the system volume indicator |
 | `tap_element`, `wait_for_element` | Find by text / accessibility ID / type, with waiting and `scrollDirection` scroll-to-find |
 | `type_text` | Type into the focused field (`submit` presses return, `deleteCount` deletes first) |
-| `press_button` | `home`, `volumeUp`, `volumeDown`, `action`, `camera` |
+| `press_button` | `home`, `volumeUp`, `volumeDown`, `action`, `camera`. `action` and `camera` run whatever the phone has them set to, and fail on a device without that button |
 | `siri` | Send text to Siri as if spoken, or tap something it shows, and read back what it shows. Its first-run "Turn on shortcuts" prompt only works from Type to Siri (double-tap the bottom edge) |
 | `open_url` | Open a URL or deep link |
 | `set_orientation` | Rotate the interface |
 | `start_driver`, `stop_driver` | Manage the on-device driver explicitly (`rebuild: true` forces a rebuild) |
 
 Text matching in `tap_element` tries exact label/ID/value matches first, then whole-word matches in short labels. Every result says which element was tapped. Give your app accessibility identifiers and match with `id` for the most reliable tests.
+
+## Testing Siri and the Action button
+
+The `siri` tool gives Siri a phrase as if it had been spoken and returns the text Siri shows. It really runs, so this tests the path from the phrase through your App Intent to what Siri says back:
+
+```text
+siri text: "Check MyApp"
+  → the text Siri shows, one line per element
+siri tap: "Turn On"
+  → taps a button or row Siri is showing
+press_button name: "action"
+  → runs what the Action button is set to
+```
+
+- **Siri's own UI:** use `tap` on `siri`. A coordinate tap goes to the app behind Siri and dismisses it.
+- **Timing:** Siri has no finished signal, so the tool reads the screen after a fixed wait. Raise `wait` (default 6 s) for a slow intent.
+- **First run of an app's shortcuts:** the "Turn on shortcuts with Siri?" prompt fails with "Something went wrong" after text sent this way, and the logs put the failure inside Siri, before the app. Double-tap the bottom edge of the screen to open Type to Siri, type the phrase, tap the send arrow, then use `siri tap: "Turn On"`. After that, text sent with `siri` works.
+- **Action button:** the tool presses it but doesn't change what it's set to. Choose the action in Settings first.
 
 ## Known limitations
 
@@ -105,6 +123,8 @@ Text matching in `tap_element` tries exact label/ID/value matches first, then wh
 - **Logs:** `os_log`/`Logger` capture works like Xcode's console: the app is launched with `OS_ACTIVITY_DT_MODE` (and `OS_ACTIVITY_MODE=debug`), which mirrors its log messages to stderr. Only messages from the app's own process are captured, not from system daemons or extensions. Private values show in plain text. Lines show `[category]` but not the subsystem.
 - **Recording sync:** recordings use `ffmpeg` (`brew install ffmpeg`), and the terminal needs microphone permission. Recording start is measured to about ±70 ms. XCUITest takes about 0.4–0.7 s to deliver a tap, so the result gives a window ("sent at … completed at …"), and in testing the sound always landed inside it.
 - **Volume:** iOS has no API to set the volume, and the level an app can read goes stale. `set_volume` presses the buttons and reads SpringBoard's volume indicator to verify the level, so the indicator briefly shows on screen.
+- **Siri:** phrases are sent as text, so this doesn't test how Siri hears them. Anything Siri can do happens for real, including sending messages.
+- **Camera button:** `press_button` with `camera` hasn't been tried on a device yet. The Action button has, on an iPhone 15 Pro Max.
 - **No lock/unlock or Face ID simulation.**
 
 ## License

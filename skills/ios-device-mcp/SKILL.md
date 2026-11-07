@@ -1,6 +1,6 @@
 ---
 name: ios-device-mcp
-description: "Drive a real, USB-connected iPhone or iPad through the ios-device-mcp server to build, install, launch and test an iOS app on hardware: tap, type, read the screen, capture print/os_log output, pull files from the app container, and record audio in sync with a tap. Use when testing on a physical device rather than the simulator, or when the user says \"run it on my phone\", \"test on device\", \"what's on the device screen\", or needs real audio, microphone or hardware behavior."
+description: "Drive a real, USB-connected iPhone or iPad through the ios-device-mcp server to build, install, launch and test an iOS app on hardware: tap, type, read the screen, capture print/os_log output, pull files from the app container, record audio in sync with a tap, and test Siri phrases, App Intents and the Action button. Use when testing on a physical device rather than the simulator, or when the user says \"run it on my phone\", \"test on device\", \"what's on the device screen\", or needs real audio, microphone or hardware behavior, or wants to try a Siri phrase or the Action button."
 ---
 
 # Testing on a real iOS device
@@ -22,7 +22,9 @@ https://github.com/ChrisThoma/ios-device-mcp and stop.
   on different devices pass `device` on every call and never select.
 - **The device is personal.** It's usually the user's own phone, so don't
   change settings, send messages, make purchases or confirm destructive
-  dialogs ("Delete", "Reset", "Erase") outside the app under test.
+  dialogs ("Delete", "Reset", "Erase") outside the app under test. `siri`
+  runs for real, so only send phrases for the app under test, never one
+  that could message, call or buy.
 - **Check what you tapped.** Every tap result names the element it hit.
   If it isn't what you meant, stop and look (`describe_ui`) before the
   next action.
@@ -66,6 +68,20 @@ https://github.com/ChrisThoma/ios-device-mcp and stop.
 - **System alerts** (permission prompts) appear at the end of
   `describe_ui` output; `tap_element` searches them first. Ask the user
   before granting a permission they may not want granted.
+
+- **Siri and App Intents:** `siri` with `text` sends a phrase as if spoken
+  and returns the text Siri shows. Check that against what the intent
+  should say, then confirm the change in the app. For Siri's own buttons
+  use `siri` with `tap`, because a coordinate tap goes to the app behind
+  Siri and dismisses it. Raise `wait` (default 6 s) for slow intents. If
+  the app's first-run "Turn on shortcuts with Siri?" prompt ends in
+  "Something went wrong", that's Siri rejecting sent text, not an app
+  bug: double-tap the bottom edge of the screen to open Type to Siri, type
+  the phrase, tap the send arrow, then `siri` with `tap: "Turn On"`.
+  Turning this on changes a setting on the phone, so ask first.
+- **Action button:** `press_button` with `action` runs whatever the phone
+  has it set to. Ask the user to set it to the shortcut under test, since
+  that's a system setting. It fails on a device without the button.
 
 ## When things go wrong
 
