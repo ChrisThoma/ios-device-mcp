@@ -2,7 +2,7 @@
 
 ![ios-device-mcp: an MCP server for testing on a real iPhone](https://individuation.dev/projects/ios-device-mcp/share-card.png)
 
-An MCP server that drives a real iPhone or iPad (not the simulator) over USB for app development testing. It can build and install your app, launch it with console log capture, read the accessibility tree, tap, swipe, type and take screenshots. It can also talk to Siri and press the Action button, so an agent can run your App Intents on the phone.
+An MCP server that drives a real iPhone or iPad (not the simulator) over USB for app development testing. It can build and install your app, launch it with console log capture, read the accessibility tree, tap, swipe, type and take screenshots. It can also talk to Siri and press the Action button, so an agent can run your App Shortcuts and App Intents on the phone.
 
 More about it: [individuation.dev/projects/ios-device-mcp](https://individuation.dev/projects/ios-device-mcp/).
 
@@ -16,7 +16,7 @@ The driver starts automatically the first time a UI tool runs, takes about 5–8
 
 ## Requirements
 
-- macOS with Xcode 16+ and `xcodegen` (`brew install xcodegen`); `ffmpeg` for audio recording (`brew install ffmpeg`)
+- macOS with Xcode 16+ (tested with Xcode 27.1) and `xcodegen` (`brew install xcodegen`); `ffmpeg` for audio recording (`brew install ffmpeg`)
 - Node 20+
 - An iPhone/iPad that is paired, has Developer Mode on, is unlocked, and is registered in your developer team
 
@@ -96,7 +96,9 @@ guides the agent; the MCP server above is what does the work.
 
 Text matching in `tap_element` tries exact label/ID/value matches first, then whole-word matches in short labels. Every result says which element was tapped. Give your app accessibility identifiers and match with `id` for the most reliable tests.
 
-## Testing Siri and the Action button
+## Testing Siri, App Shortcuts and the Action button
+
+Tested on an iPhone 15 Pro Max with iOS 27.0.1 and Xcode 27.1, where the Action button was pressed as well. The Camera button hasn't been tried on a device yet.
 
 The `siri` tool gives Siri a phrase as if it had been spoken and returns the text Siri shows. It really runs, so this tests the path from the phrase through your App Intent to what Siri says back:
 
@@ -111,7 +113,7 @@ press_button name: "action"
 
 - **Siri's own UI:** use `tap` on `siri`. A coordinate tap goes to the app behind Siri and dismisses it.
 - **Timing:** Siri has no finished signal, so the tool reads the screen after a fixed wait. Raise `wait` (default 6 s) for a slow intent.
-- **First run of an app's shortcuts:** the "Turn on shortcuts with Siri?" prompt fails with "Something went wrong" after text sent this way, and the logs put the failure inside Siri, before the app. Double-tap the bottom edge of the screen to open Type to Siri, type the phrase, tap the send arrow, then use `siri tap: "Turn On"`. After that, text sent with `siri` works.
+- **First run of an app's shortcuts:** the "Turn on shortcuts with Siri?" prompt doesn't work after text sent this way. It usually fails with "Something went wrong", with the logs putting the failure inside Siri, before the app, and in one run it stalled the driver. Double-tap the bottom edge of the screen to open Type to Siri, type the phrase, tap the send arrow, then use `siri tap: "Turn On"`. After that, text sent with `siri` works.
 - **Action button:** the tool presses it but doesn't change what it's set to. Choose the action in Settings first.
 
 ## Known limitations
