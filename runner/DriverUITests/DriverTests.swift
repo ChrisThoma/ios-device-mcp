@@ -103,7 +103,13 @@ final class DriverTests: XCTestCase {
 
         case ("POST", "/type"):
             guard let text = body["text"] as? String else { return .error("text is required", status: 400) }
-            foregroundApp().app.typeText(text)
+            // Type to Siri's field belongs to Siri, not the app behind it, so
+            // type into whichever element has keyboard focus.
+            if let field = focusedTextInput() {
+                field.typeText(text)
+            } else {
+                foregroundApp().app.typeText(text)
+            }
             return .json(["ok": true])
 
         case ("POST", "/button"):
@@ -133,6 +139,7 @@ final class DriverTests: XCTestCase {
         case ("POST", "/siri"):
             let siri = XCUIDevice.shared.siriService
             if let label = body["tap"] as? String {
+                guard siriShowing() else { return .error("Siri isn't showing", status: 409) }
                 // Coordinate taps go to the app behind Siri and dismiss it.
                 let matches = [siri.buttons[label], siri.staticTexts[label]]
                 guard let match = matches.first(where: { $0.exists }) else {
@@ -146,6 +153,9 @@ final class DriverTests: XCTestCase {
             }
             // Siri has no finished signal, so read what it shows after a fixed wait.
             RunLoop.current.run(until: Date().addingTimeInterval(body["wait"] as? Double ?? 6))
+            guard siriShowing() else {
+                return .json(["ok": true, "labels": [String](), "closed": true])
+            }
             let elements = siri.staticTexts.allElementsBoundByIndex + siri.buttons.allElementsBoundByIndex
             // Siri can dismiss itself mid-read. A snapshot throws where .label would end the test run.
             let labels = elements.compactMap { (try? $0.snapshot())?.label }.filter { !$0.isEmpty }
@@ -301,6 +311,28 @@ final class DriverTests: XCTestCase {
     /// isHittable, which can block for seconds while an app is in front.
     private func homeScreenVisible() -> Bool {
         springboard.otherElements["Home screen icons"].firstMatch.exists
+    }
+
+    /// The text field or view that has keyboard focus, looking in Siri and
+    /// SpringBoard as well as the foreground app. Nil if none does.
+    private func focusedTextInput() -> XCUIElement? {
+        let focused = NSPredicate(format: "hasKeyboardFocus == true")
+        var queries = [springboard.textFields, springboard.textViews]
+        if siriShowing() {
+            let siri = XCUIDevice.shared.siriService
+            queries = [siri.textFields, siri.textViews] + queries
+        }
+        for query in queries {
+            let match = query.matching(focused).firstMatch
+            if match.exists { return match }
+        }
+        return nil
+    }
+
+    /// Whether Siri is on screen. Queries on siriService block for 30s or
+    /// more while Siri is closed, so check this before making one.
+    private func siriShowing() -> Bool {
+        XCUIApplication(bundleIdentifier: "com.apple.siri").state == .runningForeground
     }
 
     /// Screen size in points. UIScreen.main is unreliable here because the test

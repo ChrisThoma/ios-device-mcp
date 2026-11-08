@@ -609,7 +609,7 @@ server.registerTool(
   "siri",
   {
     description:
-      "Send text to Siri as if it had been spoken, or tap something Siri is showing, then return the text Siri shows. Use tap for Siri's buttons, because a coordinate tap goes to the app behind Siri and dismisses it. Anything Siri can do runs for real, including App Intents. An app's first-run \"Turn on shortcuts with Siri?\" prompt fails with \"Something went wrong\" after text sent this way: double-tap the bottom edge of the screen to open Type to Siri, type the phrase, tap the send arrow, then use tap for Turn On.",
+      "Send text to Siri as if it had been spoken, or tap something Siri is showing, then return the text Siri shows. Use tap for Siri's buttons, because a coordinate tap goes to the app behind Siri and dismisses it. Anything Siri can do runs for real, including App Intents. An app's first-run \"Turn on shortcuts with Siri?\" prompt fails with \"Something went wrong\" after text sent this way. Use Type to Siri for that once: double_tap the bottom edge of the screen, tap the \"Ask Siri\" field so the keyboard shows, type_text the phrase, then tap the send arrow at the field's right end by coordinates from a screenshot (return adds a line, and while the keyboard is up Siri reports its buttons below the screen, so tap: \"Submit\" hits a key). When the prompt shows, use tap: \"Turn On\". Later phrases work with text.",
     inputSchema: {
       ...deviceArg,
       text: z.string().optional().describe("What to say to Siri"),
@@ -620,6 +620,7 @@ server.registerTool(
   handle(async ({ device, text: query, tap, wait }) => {
     const { driver } = await getDriver(device);
     const result = await driver.request("POST", "/siri", { text: query, tap, wait });
+    if (result.closed) return text("Siri closed before its text could be read; take a screenshot.");
     return text(result.labels?.length ? result.labels.join("\n") : "Siri showed no readable text; take a screenshot.");
   }),
 );

@@ -113,7 +113,7 @@ press_button name: "action"
 
 - **Siri's own UI:** use `tap` on `siri`. A coordinate tap goes to the app behind Siri and dismisses it.
 - **Timing:** Siri has no finished signal, so the tool reads the screen after a fixed wait. Raise `wait` (default 6 s) for a slow intent.
-- **First run of an app's shortcuts:** the "Turn on shortcuts with Siri?" prompt doesn't work after text sent this way. It usually fails with "Something went wrong", with the logs putting the failure inside Siri, before the app, and in one run it stalled the driver. Double-tap the bottom edge of the screen to open Type to Siri, type the phrase, tap the send arrow, then use `siri tap: "Turn On"`. After that, text sent with `siri` works.
+- **First run of an app's shortcuts:** the "Turn on shortcuts with Siri?" prompt doesn't work after text sent this way. It fails with "Something went wrong", with the logs putting the failure inside Siri, before the app. Use Type to Siri once instead: `double_tap` the bottom edge of the screen, tap the "Ask Siri" field so the keyboard shows, `type_text` the phrase, then tap the send arrow at the field's right end by its coordinates in a screenshot. Return adds a new line, and while the keyboard is up Siri reports its buttons below the screen, so `siri tap: "Submit"` hits a key. When the prompt shows, use `siri tap: "Turn On"`. After that, text sent with `siri` works.
 - **Action button:** the tool presses it but doesn't change what it's set to. Choose the action in Settings first.
 
 ## Known limitations

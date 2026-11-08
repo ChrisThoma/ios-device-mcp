@@ -76,8 +76,11 @@ https://github.com/ChrisThoma/ios-device-mcp and stop.
   Siri and dismisses it. Raise `wait` (default 6 s) for slow intents. If
   the app's first-run "Turn on shortcuts with Siri?" prompt ends in
   "Something went wrong", that's Siri rejecting sent text, not an app
-  bug: double-tap the bottom edge of the screen to open Type to Siri, type
-  the phrase, tap the send arrow, then `siri` with `tap: "Turn On"`.
+  bug. Use Type to Siri once: `double_tap` the bottom edge of the screen,
+  tap the "Ask Siri" field so the keyboard shows, `type_text` the phrase,
+  then tap the send arrow at the field's right end by its coordinates in a
+  screenshot (return adds a line, and `siri` `tap: "Submit"` hits a key
+  while the keyboard is up). Then `siri` with `tap: "Turn On"`.
   Turning this on changes a setting on the phone, so ask first.
 - **Action button:** `press_button` with `action` runs whatever the phone
   has it set to. Ask the user to set it to the shortcut under test, since
