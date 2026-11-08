@@ -1,6 +1,6 @@
 {
   "name": "ios-device-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server that drives a real, plugged-in iPhone or iPad (not the simulator) for app testing, including Siri and App Shortcuts",
   "license": "MIT",
   "author": "Chris Thoma",

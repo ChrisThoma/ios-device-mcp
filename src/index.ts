@@ -15,7 +15,7 @@ import { describeElement, findElements, renderTree, type ElementQuery, type UINo
 const exec = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const server = new McpServer({ name: "ios-device-mcp", version: "0.2.0" });
+const server = new McpServer({ name: "ios-device-mcp", version: "0.2.1" });
 
 type ToolResult = { content: any[]; isError?: boolean };
 const text = (t: string): ToolResult => ({ content: [{ type: "text", text: t }] });
