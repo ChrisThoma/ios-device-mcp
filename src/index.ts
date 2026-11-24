@@ -31,6 +31,8 @@ function handle<A>(fn: (args: A) => Promise<ToolResult>) {
   };
 }
 
+const bundleIdArg = { bundleId: z.string().describe("App bundle ID, e.g. com.example.MyApp (see list_apps)") };
+
 const deviceArg = {
   device: z
     .string()
@@ -63,7 +65,10 @@ async function getTree(driver: Driver, bundleId?: string) {
 
 server.registerTool(
   "list_devices",
-  { description: "List physical iPhones/iPads known to this Mac, with connection state. The device tools use by default is marked." },
+  {
+    description: "List physical iPhones/iPads known to this Mac, with connection state. The device tools use by default is marked.",
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
   handle(async () => {
     const devices = await dc.listDevices();
     if (!devices.length) return text("No physical devices found.");
@@ -84,6 +89,7 @@ server.registerTool(
   {
     description:
       "Choose which device later calls use when they don't pass \"device\". Lasts for this server session and is shared by every agent using it, so parallel agents on different devices should pass \"device\" instead. Omit device to clear the choice.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: { device: z.string().optional().describe("Device UDID or name substring; omit to clear") },
   },
   handle(async ({ device }) => {
@@ -97,7 +103,9 @@ server.registerTool(
 server.registerTool(
   "list_apps",
   {
-    description: "List apps installed on the device.",
+    description:
+      "List the apps installed on the device, sorted by name, as `Name (bundleId) vVersion`. Use it to find the bundle ID other tools need. Reads through devicectl, so it doesn't start the driver.",
+    annotations: { readOnlyHint: true, openWorldHint: false },
     inputSchema: { ...deviceArg, includeSystem: z.boolean().optional().describe("Include Apple system apps") },
   },
   handle(async ({ device, includeSystem }) => {
@@ -112,11 +120,12 @@ server.registerTool(
   {
     description:
       "Build an Xcode project/workspace scheme for the device and (by default) install it. Returns the bundle ID. Signing uses the project's own settings.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       ...deviceArg,
       project: z.string().optional().describe("Path to .xcodeproj"),
       workspace: z.string().optional().describe("Path to .xcworkspace"),
-      scheme: z.string(),
+      scheme: z.string().describe("Xcode scheme that builds the app"),
       configuration: z.string().optional().describe("Default: Debug"),
       install: z.boolean().optional().describe("Install after building (default true)"),
     },
@@ -145,7 +154,12 @@ server.registerTool(
 
 server.registerTool(
   "install_app",
-  { description: "Install a built .app (or .ipa) onto the device.", inputSchema: { ...deviceArg, path: z.string() } },
+  {
+    description:
+      "Install an already built .app or .ipa from the Mac onto the device, and return its bundle ID. It must be signed for this device. Use build_app to build from Xcode sources and install in one step. Doesn't launch the app; call launch_app next.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    inputSchema: { ...deviceArg, path: z.string().describe("Path on the Mac to the .app or .ipa") },
+  },
   handle(async ({ device, path }) => {
     const full = resolve(path);
     if (!existsSync(full)) throw new Error(`No such file: ${full}`);
@@ -157,7 +171,12 @@ server.registerTool(
 
 server.registerTool(
   "uninstall_app",
-  { description: "Uninstall an app (and its data) from the device.", inputSchema: { ...deviceArg, bundleId: z.string() } },
+  {
+    description:
+      "Permanently remove an app and all its data from the device. Data can't be recovered, so pull_file anything needed first. To only close an app use terminate_app.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: { ...deviceArg, ...bundleIdArg },
+  },
   handle(async ({ device, bundleId }) => {
     const { udid } = await dc.resolveDevice(device);
     await dc.uninstallApp(udid, bundleId);
@@ -187,13 +206,14 @@ server.registerTool(
   "launch_app",
   {
     description:
-      "Launch (or relaunch) an app in the foreground. With captureLogs, the app's console output — print/NSLog and os_log/Logger messages — is buffered for get_app_logs.",
+      "Launch an app in the foreground, restarting it if it is already running. With captureLogs, the app's console output (print/NSLog and os_log/Logger messages) is buffered for get_app_logs, keeping the last 5000 lines; starting a new capture discards the old buffer. The app must already be installed. Use open_url to enter through a deep link.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
-      bundleId: z.string(),
-      arguments: z.array(z.string()).optional(),
-      environment: z.record(z.string(), z.string()).optional(),
-      captureLogs: z.boolean().optional(),
+      ...bundleIdArg,
+      arguments: z.array(z.string()).optional().describe("Launch arguments passed to the app"),
+      environment: z.record(z.string(), z.string()).optional().describe("Environment variables set for the app"),
+      captureLogs: z.boolean().optional().describe("Buffer console output for get_app_logs (default false)"),
       logLevel: z
         .enum(["debug", "info", "stdout"])
         .optional()
@@ -241,9 +261,10 @@ server.registerTool(
   {
     description:
       "Read console output captured from an app started with launch_app captureLogs=true. os_log/Logger lines look like `<timestamp> App[pid:tid] [category] message`.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
-      bundleId: z.string(),
+      ...bundleIdArg,
       lines: z.number().int().optional().describe("Last N matching lines (default 200)"),
       grep: z.string().optional().describe("Case-insensitive regex; only matching lines are returned (e.g. a category like \"\\[network\\]\")"),
       clear: z.boolean().optional().describe("Clear the buffer after reading"),
@@ -267,7 +288,12 @@ server.registerTool(
 
 server.registerTool(
   "terminate_app",
-  { description: "Force-quit an app.", inputSchema: { ...deviceArg, bundleId: z.string() } },
+  {
+    description:
+      "Force-quit a running app by bundle ID, without removing it or its data. Any unsaved state in the app is lost. Use launch_app to restart an app (it quits the old copy itself), and press_button home to leave an app without quitting it.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    inputSchema: { ...deviceArg, ...bundleIdArg },
+  },
   handle(async ({ device, bundleId }) => {
     const { driver } = await getDriver(device);
     await driver.request("POST", "/terminate", { bundleId });
@@ -282,6 +308,7 @@ server.registerTool(
   {
     description:
       "Start the on-device XCUITest driver (UI tools start it automatically). The first run on a device builds the runner and iOS asks for the passcode to allow UI automation.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     inputSchema: { ...deviceArg, rebuild: z.boolean().optional().describe("Force a rebuild of the runner") },
   },
   handle(async ({ device, rebuild }) => {
@@ -295,7 +322,12 @@ server.registerTool(
 
 server.registerTool(
   "stop_driver",
-  { description: "Stop the on-device driver.", inputSchema: deviceArg },
+  {
+    description:
+      "Stop the XCUITest driver on the device. Rarely needed: it stops when the server exits, and the next tool that needs it starts it again. Succeeds even if no driver is running.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: deviceArg,
+  },
   handle(async ({ device }) => {
     const { udid } = await dc.resolveDevice(device);
     await driverFor(udid).stop();
@@ -310,6 +342,7 @@ server.registerTool(
   {
     description:
       "Take a screenshot. By default it is scaled to screen points, so image pixel coordinates equal tap coordinates.",
+    annotations: { readOnlyHint: true, openWorldHint: false },
     inputSchema: { ...deviceArg, fullRes: z.boolean().optional().describe("Native pixel resolution instead of points") },
   },
   handle(async ({ device, fullRes }) => {
@@ -329,10 +362,11 @@ server.registerTool(
   {
     description:
       "Accessibility tree of the foreground app (plus any system alert), one element per line: Type \"label\" #identifier value=… @(centerX,centerY) WxH. Coordinates are in points and can be passed to tap.",
+    annotations: { readOnlyHint: true, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
       bundleId: z.string().optional().describe("Inspect this app instead of the detected foreground app"),
-      includeOffscreen: z.boolean().optional(),
+      includeOffscreen: z.boolean().optional().describe("Include elements outside the screen, marked [offscreen] (default false)"),
       format: z.enum(["text", "json"]).optional().describe("json returns the raw tree"),
     },
   },
@@ -393,7 +427,12 @@ function fileSeconds(wavPath: string): number {
 
 server.registerTool(
   "tap",
-  { description: "Tap at screen coordinates (points).", inputSchema: { ...deviceArg, ...point, ...recordAudioArg } },
+  {
+    description:
+      "Tap once at screen coordinates in points, as given by describe_ui or a default screenshot. Prefer tap_element when the target has a label or identifier, because it waits for the element and survives layout changes. Doesn't check that anything was hit; verify with describe_ui or screenshot.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    inputSchema: { ...deviceArg, ...point, ...recordAudioArg },
+  },
   handle(async ({ device, x, y, recordAudio }) => {
     const { driver } = await getDriver(device);
     const tap = () => driver.request("POST", "/tap", { x, y });
@@ -406,7 +445,7 @@ server.registerTool(
 );
 
 const elementQuery = {
-  text: z.string().optional().describe("Matches label, identifier, value or placeholder (exact first, then substring, case-insensitive)"),
+  text: z.string().optional().describe("Case-insensitive. Exact matches on label, identifier, value or placeholder rank first, then whole-word matches inside a short label, identifier or placeholder"),
   id: z.string().optional().describe("Exact accessibility identifier"),
   type: z.string().optional().describe("Element type, e.g. Button, TextField, Cell, Switch"),
   index: z.number().int().optional().describe("Pick the Nth best match (0-based)"),
@@ -481,7 +520,9 @@ async function waitForElement(driver: Driver, q: WaitQuery, gone = false) {
 server.registerTool(
   "tap_element",
   {
-    description: "Find an element by text/identifier/type, waiting for it to appear, and tap its center.",
+    description:
+      "Find an element by text, identifier or type, wait for it to appear (5 s by default), and tap its center once. Prefer this to tap when the target is in the accessibility tree. Pass at least one of text, id or type. System alerts are searched before the app. Returns the element tapped, and the match count when there are several; fails if none appears in time. With scrollDirection it scrolls to find off-screen elements.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: { ...deviceArg, ...elementQuery, ...recordAudioArg },
   },
   handle(async ({ device, recordAudio, ...q }) => {
@@ -501,8 +542,10 @@ server.registerTool(
 server.registerTool(
   "wait_for_element",
   {
-    description: "Wait until an element appears (or disappears with gone=true).",
-    inputSchema: { ...deviceArg, ...elementQuery, gone: z.boolean().optional() },
+    description:
+      "Wait until an element appears, or disappears with gone=true, without tapping it. Use it after an action to wait for a screen or for a spinner to go away; use tap_element to wait and tap. Pass at least one of text, id or type. Returns the element's description and center, and fails when the timeout (5 s by default) passes. With scrollDirection it scrolls the screen while looking.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    inputSchema: { ...deviceArg, ...elementQuery, gone: z.boolean().optional().describe("Wait for the element to disappear instead (default false)") },
   },
   handle(async ({ device, gone, ...q }) => {
     const { driver } = await getDriver(device);
@@ -513,7 +556,12 @@ server.registerTool(
 
 server.registerTool(
   "double_tap",
-  { description: "Double-tap at coordinates (points).", inputSchema: { ...deviceArg, ...point } },
+  {
+    description:
+      "Double-tap at screen coordinates in points, as given by describe_ui or a default screenshot. Use it for gestures such as zooming or selecting a word; use tap for a single tap. Doesn't check that anything was hit.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    inputSchema: { ...deviceArg, ...point },
+  },
   handle(async ({ device, x, y }) => {
     const { driver } = await getDriver(device);
     await driver.request("POST", "/double_tap", { x, y });
@@ -524,7 +572,9 @@ server.registerTool(
 server.registerTool(
   "long_press",
   {
-    description: "Press and hold at coordinates (points).",
+    description:
+      "Press and hold at screen coordinates in points, then release. Use it for context menus and other hold gestures; use swipe to drag. Doesn't check that anything was hit; verify with describe_ui or screenshot.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: { ...deviceArg, ...point, duration: z.number().optional().describe("Seconds (default 1)") },
   },
   handle(async ({ device, x, y, duration }) => {
@@ -537,13 +587,15 @@ server.registerTool(
 server.registerTool(
   "swipe",
   {
-    description: "Drag from one point to another (points).",
+    description:
+      "Drag one finger in a straight line from one point to another (screen points), then release. Use it for precise gestures such as row actions, sliders or edge swipes; to scroll content use scroll, and to scroll until an element appears use tap_element with scrollDirection. A shorter duration makes a faster drag. Doesn't check the result; verify with describe_ui or screenshot.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
-      fromX: z.number(),
-      fromY: z.number(),
-      toX: z.number(),
-      toY: z.number(),
+      fromX: z.number().describe("Start, points from left"),
+      fromY: z.number().describe("Start, points from top"),
+      toX: z.number().describe("End, points from left"),
+      toY: z.number().describe("End, points from top"),
       duration: z.number().optional().describe("Seconds (default 0.3)"),
     },
   },
@@ -558,9 +610,10 @@ server.registerTool(
   "scroll",
   {
     description: "Scroll the content in a direction (\"down\" reveals content further down) by swiping from the middle of the screen.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
-      direction: z.enum(["up", "down", "left", "right"]),
+      direction: z.enum(["up", "down", "left", "right"]).describe("Where to look: down reveals content further down"),
       amount: z.number().optional().describe("Fraction of the screen to scroll, 0.1–0.8 (default 0.5)"),
     },
   },
@@ -575,9 +628,10 @@ server.registerTool(
   "type_text",
   {
     description: "Type into the focused text field (tap the field first). Use \\n for return.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
-      text: z.string(),
+      text: z.string().describe("Text to type; \\n presses return"),
       submit: z.boolean().optional().describe("Press return after typing"),
       deleteCount: z.number().int().min(0).optional().describe("Press delete this many times before typing, e.g. to clear a field"),
     },
@@ -596,7 +650,8 @@ server.registerTool(
   {
     description:
       "Press a hardware button. \"home\" goes to the home screen. \"action\" and \"camera\" run whatever the phone has them set to, and fail on a device without that button.",
-    inputSchema: { ...deviceArg, name: z.enum(["home", "volumeUp", "volumeDown", "action", "camera"]) },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    inputSchema: { ...deviceArg, name: z.enum(["home", "volumeUp", "volumeDown", "action", "camera"]).describe("Button to press") },
   },
   handle(async ({ device, name }) => {
     const { driver } = await getDriver(device);
@@ -610,6 +665,7 @@ server.registerTool(
   {
     description:
       "Send text to Siri as if it had been spoken, or tap something Siri is showing, then return the text Siri shows. Use tap for Siri's buttons, because a coordinate tap goes to the app behind Siri and dismisses it. Anything Siri can do runs for real, including App Intents. An app's first-run \"Turn on shortcuts with Siri?\" prompt fails with \"Something went wrong\" after text sent this way. Use Type to Siri for that once: double_tap the bottom edge of the screen, tap the \"Ask Siri\" field so the keyboard shows, type_text the phrase, then tap the send arrow at the field's right end by coordinates from a screenshot (return adds a line, and while the keyboard is up Siri reports its buttons below the screen, so tap: \"Submit\" hits a key). When the prompt shows, use tap: \"Turn On\". Later phrases work with text.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       ...deviceArg,
       text: z.string().optional().describe("What to say to Siri"),
@@ -627,7 +683,12 @@ server.registerTool(
 
 server.registerTool(
   "open_url",
-  { description: "Open a URL or deep link (custom scheme or universal link) on the device.", inputSchema: { ...deviceArg, url: z.string() } },
+  {
+    description:
+      "Open a web URL or deep link (custom scheme or universal link) on the device, in whichever app iOS picks for it. Use it to test deep links or jump to a screen; use launch_app to start an app by bundle ID. Returns once the request is sent and doesn't check that an app opened it; verify with describe_ui or screenshot.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    inputSchema: { ...deviceArg, url: z.string().describe("e.g. https://example.com or myapp://settings") },
+  },
   handle(async ({ device, url }) => {
     const { driver } = await getDriver(device);
     await driver.request("POST", "/open_url", { url });
@@ -640,6 +701,7 @@ server.registerTool(
   {
     description:
       "Set the device's media volume by pressing the volume buttons toward the level, verifying each step on the system volume indicator. iOS volume has 16 steps, so levels round to the nearest 1/16. Returns the final level.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     inputSchema: { ...deviceArg, level: z.number().min(0).max(1).describe("0 (mute) to 1 (max)") },
   },
   handle(async ({ device, level }) => {
@@ -654,8 +716,9 @@ server.registerTool(
   "record_audio",
   {
     description: "Record the Mac microphone for a number of seconds (e.g. to capture what the device plays). Returns the WAV path.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: {
-      seconds: z.number().positive().max(300),
+      seconds: z.number().positive().max(300).describe("Length to record, up to 300; the file can run about 1 s longer"),
       audioDevice: z.string().optional().describe("Mac input name substring (default: built-in mic, never an iPhone/iPad mic)"),
     },
   },
@@ -670,7 +733,8 @@ server.registerTool(
   "list_app_files",
   {
     description: "List files in an app's data container (Documents, Library, tmp…). Works for development-signed apps only.",
-    inputSchema: { ...deviceArg, bundleId: z.string(), subdirectory: z.string().optional().describe("e.g. Documents") },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    inputSchema: { ...deviceArg, ...bundleIdArg, subdirectory: z.string().optional().describe("e.g. Documents") },
   },
   handle(async ({ device, bundleId, subdirectory }) => {
     const { udid } = await dc.resolveDevice(device);
@@ -688,10 +752,11 @@ server.registerTool(
   "pull_file",
   {
     description:
-      "Copy a file out of an app's data container to the Mac. Can wait for the file to appear, or to be written after the last launch_app. Small text files are returned inline.",
+      "Copy a file out of an app's data container to the Mac. Works for development-signed apps only; use list_app_files to find paths. Can wait for the file to appear, or to be written after the last launch_app. Returns the local path and size, plus the contents when it is a text file up to 64 KB. Fails if the file is missing when the wait ends.",
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
-      bundleId: z.string(),
+      ...bundleIdArg,
       path: z.string().describe("Path inside the container, e.g. Documents/result.json"),
       destination: z.string().optional().describe("Local path (default: .build/pulled/<bundleId>/<path> in the ios-device-mcp repo)"),
       waitSeconds: z.number().min(0).max(600).optional().describe("Poll this long for the file to exist (default 0)"),
@@ -754,8 +819,10 @@ server.registerTool(
 server.registerTool(
   "set_orientation",
   {
-    description: "Rotate the device's interface orientation.",
-    inputSchema: { ...deviceArg, orientation: z.enum(["portrait", "portraitUpsideDown", "landscapeLeft", "landscapeRight"]) },
+    description:
+      "Set the device's orientation as the interface sees it, to test an app's rotated layouts. An app that doesn't support the orientation may not rotate, and this doesn't check; verify with screenshot. Coordinates change after a rotation, so call describe_ui again before tapping.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    inputSchema: { ...deviceArg, orientation: z.enum(["portrait", "portraitUpsideDown", "landscapeLeft", "landscapeRight"]).describe("Orientation to set") },
   },
   handle(async ({ device, orientation }) => {
     const { driver } = await getDriver(device);
