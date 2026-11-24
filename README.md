@@ -1,5 +1,7 @@
 # ios-device-mcp
 
+[![ChrisThoma/ios-device-mcp MCP server](https://glama.ai/mcp/servers/ChrisThoma/ios-device-mcp/badges/score.svg)](https://glama.ai/mcp/servers/ChrisThoma/ios-device-mcp)
+
 ![ios-device-mcp: an MCP server for testing on a real iPhone](https://individuation.dev/projects/ios-device-mcp/share-card.png)
 
 An MCP server that drives a real iPhone or iPad (not the simulator) over USB for app development testing. It can build and install your app, launch it with console log capture, read the accessibility tree, tap, swipe, type and take screenshots. It can also talk to Siri and press the Action button, so an agent can run your App Shortcuts and App Intents on the phone.
