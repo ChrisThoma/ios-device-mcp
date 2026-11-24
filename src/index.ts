@@ -119,7 +119,7 @@ server.registerTool(
   "build_app",
   {
     description:
-      "Build an Xcode project/workspace scheme for the device and (by default) install it. Returns the bundle ID. Signing uses the project's own settings.",
+      "Build an Xcode project or workspace scheme for the device and (by default) install it, replacing the installed copy. Pass project or workspace. Use it when starting from source; use install_app for an already built .app or .ipa, and launch_app afterwards, because this doesn't launch. Signing uses the project's own settings, and Xcode may update provisioning profiles. Returns the bundle ID and .app path, or the compiler errors (up to 15 lines). Can take minutes; the build is stopped after 20.",
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     inputSchema: {
       ...deviceArg,
@@ -260,7 +260,7 @@ server.registerTool(
   "get_app_logs",
   {
     description:
-      "Read console output captured from an app started with launch_app captureLogs=true. os_log/Logger lines look like `<timestamp> App[pid:tid] [category] message`.",
+      "Read console output captured from an app started with launch_app captureLogs=true, oldest line first; it fails if no capture was started. Can't read logs from an app launched any other way. os_log/Logger lines look like `<timestamp> App[pid:tid] [category] message`. The buffer holds the last 5000 lines and stays readable after the app exits, which the result notes. clear discards every buffered line, including those grep left out.",
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
@@ -341,7 +341,7 @@ server.registerTool(
   "screenshot",
   {
     description:
-      "Take a screenshot. By default it is scaled to screen points, so image pixel coordinates equal tap coordinates.",
+      "Take a JPEG screenshot of whatever the device is showing, and return it with its size. By default it is scaled to screen points, so image pixel coordinates equal tap coordinates; fullRes images are larger and their coordinates can't be passed to tap. Use it to check how a screen looks or to see content without accessibility labels; use describe_ui to read text or find elements to tap.",
     annotations: { readOnlyHint: true, openWorldHint: false },
     inputSchema: { ...deviceArg, fullRes: z.boolean().optional().describe("Native pixel resolution instead of points") },
   },
@@ -609,7 +609,8 @@ server.registerTool(
 server.registerTool(
   "scroll",
   {
-    description: "Scroll the content in a direction (\"down\" reveals content further down) by swiping from the middle of the screen.",
+    description:
+      "Scroll the content in a direction (\"down\" reveals content further down) with one swipe centered on the middle of the screen. Use it to browse a list or page; to scroll until a known element appears use tap_element or wait_for_element with scrollDirection, and for a drag between exact points use swipe. Doesn't report whether anything moved, and content may keep coasting; check with describe_ui or screenshot.",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
@@ -627,7 +628,8 @@ server.registerTool(
 server.registerTool(
   "type_text",
   {
-    description: "Type into the focused text field (tap the field first). Use \\n for return.",
+    description:
+      "Type into the focused text field, adding to what is already there. Tap the field first (tap_element), because this doesn't choose a field. Use \\n for return, or submit to press it at the end; use deleteCount to remove existing text. It can also type into Siri's field when that has focus; to send Siri a phrase directly use siri. Doesn't check what the field ends up holding; verify with describe_ui.",
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: {
       ...deviceArg,
@@ -649,7 +651,7 @@ server.registerTool(
   "press_button",
   {
     description:
-      "Press a hardware button. \"home\" goes to the home screen. \"action\" and \"camera\" run whatever the phone has them set to, and fail on a device without that button.",
+      "Press a hardware button once. \"home\" goes to the home screen without quitting the app (terminate_app quits it). \"volumeUp\" and \"volumeDown\" move one step; to reach a level use set_volume. \"action\" and \"camera\" run whatever the phone has them set to, and fail on a device without that button. Doesn't report what the press did; check with screenshot.",
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     inputSchema: { ...deviceArg, name: z.enum(["home", "volumeUp", "volumeDown", "action", "camera"]).describe("Button to press") },
   },
